@@ -22,12 +22,13 @@ async function load(){
       if(state.recipesData)master.recipes=state.recipesData;
       if(state.productsData)master.products=state.productsData;
       if(state.pricesData)state.prices=state.pricesData;
+      if(state.manualData)master.manual=state.manualData;
     }else await save();
   }catch(e){$('#loginMsg').textContent='共有データに接続できません: '+e.message}
 }
 async function save(){
   if(!user)return;
-  await setDoc(doc(db,'shared','appData'),{...state,stockData:master.stock,recipesData:master.recipes,productsData:master.products,pricesData:state.prices,updatedAt:serverTimestamp()});
+  await setDoc(doc(db,'shared','appData'),{...state,stockData:master.stock,recipesData:master.recipes,productsData:master.products,pricesData:state.prices,manualData:master.manual,updatedAt:serverTimestamp()});
 }
 function show(){$('#tabs').hidden=!user;$('#login').hidden=!!user;$('#authState').textContent=user?(user.email||'ログイン中'):'未ログイン';if(user)render()}
 onAuthStateChanged(auth,async u=>{user=u;if(u){try{await load();show()}catch(e){$('#loginMsg').textContent=e.message;show()}}else show()});
@@ -50,7 +51,10 @@ function render(){
 function checkUI(){return `<div class="card"><h2>今日の業務チェック</h2><div class="row"><input id="staff" placeholder="スタッフ名"><input id="workdate" type="date" value="${today()}"></div>${tasks.map(t=>`<label class="check"><input type="checkbox" class="task" value="${t}">${t}</label>`).join('')}<label class="check"><input type="checkbox" class="task" value="自由項目1"><span style="display:inline-block;width:140px;border-bottom:1px solid #999">&nbsp;</span></label><label class="check"><input type="checkbox" class="task" value="自由項目2"><span style="display:inline-block;width:140px;border-bottom:1px solid #999">&nbsp;</span></label><p>両替</p><label><input type="radio" name="change" value="有り"> 有り</label> <label><input type="radio" name="change" value="無し"> 無し</label><h3>概況</h3><textarea id="overview"></textarea><h3>共有・発注</h3><textarea id="orderShare"></textarea><div class="actions"><button id="saveCheck">チェックを保存</button><button class="sub" id="shareCheck">LINE共有</button></div></div>`}
 function stockUI(){return `<div class="card"><h2>在庫管理</h2><p class="muted">入庫・廃棄・販売を記録します。</p><input id="stockSearch" placeholder="在庫を検索"><div id="stockList">${Object.entries(master.stock||{}).map(([n,v])=>`<div class="item stockrow"><b>${esc(n)}</b><span class="pill">現在庫 ${v.current}</span><div class="row"><input type="number" min="0" step="0.1" placeholder="数量" id="qty-${encodeURIComponent(n)}"><button data-stock="in" data-name="${esc(n)}">入庫＋</button><button class="danger" data-stock="out" data-name="${esc(n)}">廃棄−</button></div></div>`).join('')}</div><p class="muted">販売の登録は「売上管理」から行います。</p></div>`}
 function prepUI(){return `<div class="card"><h2>仕込み管理</h2><input id="prepName" placeholder="仕込み品目"><div class="row"><input id="prepQty" placeholder="数量"><input id="prepStaff" placeholder="担当者"></div><textarea id="prepNote" placeholder="メモ"></textarea><button id="addPrep">仕込みを登録</button></div><div class="card"><h3>仕込み項目（マニュアルより）</h3>${(master.prep||[]).map(x=>`<div class="item"><b>${esc(x.item)}</b><div>${esc(x.content)}</div><div class="muted">${esc(x.caution)}</div></div>`).join('')}${state.prep.map((p,i)=>`<div class="item"><b>${esc(p.name)}</b> ${esc(p.qty)} <span class="pill">${esc(p.status)}</span><div class="muted">${esc(p.staff)} · ${esc(p.date)}</div><button data-prepdone="${i}">完了</button></div>`).join('')}</div>`}
-function manualUI(){return `<div class="card"><h2>マニュアル</h2><input id="manualSearch" placeholder="項目・手順を検索">${Object.entries(master.manual||{}).map(([section,items])=>`<details open><summary><b>${esc(section)}</b></summary>${items.map(x=>`<div class="item"><b>${esc(x.item)}</b><div>${esc(x.content)}</div>${x.caution?`<div class="muted">注意：${esc(x.caution)}</div>`:''}</div>`).join('')}</details>`).join('')}</div>`}
+function manualUI(){
+ const sections=master.manual||{};
+ return `<div class="card"><h2>マニュアル</h2><input id="manualSearch" placeholder="項目・手順を検索"><div id="manualSections">${Object.entries(sections).map(([section,items],si)=>`<details class="manual-section" open><summary><b>${esc(section)}</b></summary><div class="manual-items">${(items||[]).map((x,i)=>`<div class="item"><b>${esc(x.item)}</b><div>${esc(x.content)}</div>${x.caution?`<div class="muted">注意：${esc(x.caution)}</div>`:''}<div class="actions"><button data-manual-edit="${si}:${i}" class="sub">編集</button><button data-manual-delete="${si}:${i}" class="danger">削除</button></div></div>`).join('')}</div></details>`).join('')}</div><hr><h3>項目を追加</h3><input id="manualNewSection" placeholder="見出し（例：開店準備）"><input id="manualNewItem" placeholder="項目名"><textarea id="manualNewContent" placeholder="手順・内容"></textarea><textarea id="manualNewCaution" placeholder="注意事項（任意）"></textarea><button id="manualAdd">追加して保存</button><p id="manualMsg" class="muted"></p></div>`;
+}
 function notesUI(){return `<div class="card"><h2>共有ノート</h2><input id="noteTitle" placeholder="タイトル"><textarea id="noteBody" placeholder="共有内容"></textarea><button id="addNote">共有ノートを投稿</button></div><div class="card">${state.notes.slice().reverse().map((n,i)=>`<div class="item"><b>${esc(n.title)}</b><div>${esc(n.body)}</div><div class="muted">${esc(n.author)} · ${esc(n.date)}</div><button class="danger" data-delnote="${state.notes.length-1-i}">削除</button></div>`).join('')}</div>`}
 function recordsUI(){return `<div class="card"><h2>記録</h2><h3>業務チェック</h3>${state.checklists.slice().reverse().map(c=>`<div class="item"><b>${esc(c.date)} · ${esc(c.staff)}</b><div class="muted">完了 ${c.done.length}/${tasks.length+2}</div><div>${esc(c.overview)}</div></div>`).join('')}<h3>在庫の履歴</h3>${state.stockAdjust.slice().reverse().map(x=>`<div class="item">${esc(x.date)} · ${esc(x.name)} ${x.delta>0?'+':''}${x.delta} (${esc(x.type)})</div>`).join('')}<h3>売上履歴</h3>${(state.sales||[]).slice().reverse().map(s=>`<div class="item">${esc(s.date)} · ${esc(s.product)} ×${s.qty} · ¥${yen(s.amount)}</div>`).join('')}<h3>仕込み履歴</h3>${state.prep.map(p=>`<div class="item">${esc(p.date)} · ${esc(p.name)} ${esc(p.qty)} ${esc(p.status)}</div>`).join('')}</div>`}
 function salesUI(){
@@ -71,7 +75,16 @@ function wire(){
  let el=id=>document.getElementById(id);
  if(tab==='check'){
   el('saveCheck').onclick=async()=>{let done=[...document.querySelectorAll('.task:checked')].map(x=>x.value),c={date:el('workdate').value,staff:el('staff').value,done,change:document.querySelector('input[name=change]:checked')?.value||'',overview:el('overview').value,orderShare:el('orderShare').value};state.checklists.push(c);await save();alert('保存しました')};
-  el('shareCheck').onclick=()=>{let msg=`【POLEPOLE CAFE 業務チェック】\n日付：${el('workdate').value}\n担当：${el('staff').value}\n完了：${[...document.querySelectorAll('.task:checked')].map(x=>x.value).join('、')}\n両替：${document.querySelector('input[name=change]:checked')?.value||'未入力'}\n概況：${el('overview').value}\n共有・発注：${el('orderShare').value}`;if(navigator.share)navigator.share({text:msg});else{navigator.clipboard.writeText(msg);alert('LINEに貼り付ける文章をコピーしました')}};
+  el('shareCheck').onclick=()=>{
+   const date=el('workdate').value;
+   const daily=(state.sales||[]).filter(s=>s.date===date);
+   const total=daily.reduce((n,s)=>n+Number(s.amount||0),0);
+   const grouped={};
+   daily.forEach(s=>{if(!grouped[s.product])grouped[s.product]={qty:0,amount:0};grouped[s.product].qty+=Number(s.qty||0);grouped[s.product].amount+=Number(s.amount||0)});
+   const salesText=Object.entries(grouped).map(([name,v])=>`${name} ×${v.qty}　¥${yen(v.amount)}`).join('\n')||'売上登録なし';
+   const msg=`【POLEPOLE CAFE 業務報告】\n日付：${date}\n担当：${el('staff').value}\n完了：${[...document.querySelectorAll('.task:checked')].map(x=>x.value).join('、')}\n両替：${document.querySelector('input[name=change]:checked')?.value||'未入力'}\n概況：${el('overview').value}\n共有・発注：${el('orderShare').value}\n【売上報告】\n売上合計：¥${yen(total)}\n${salesText}`;
+   if(navigator.share)navigator.share({text:msg}).catch(()=>{});else navigator.clipboard.writeText(msg).then(()=>alert('共有文をコピーしました')).catch(()=>alert('共有文をコピーできませんでした'));
+  };
  }
  if(tab==='stock'){
   document.querySelectorAll('[data-stock]').forEach(b=>b.onclick=async()=>{let n=b.dataset.name,q=Number(el('qty-'+encodeURIComponent(n)).value||0);if(!q)return;let d=b.dataset.stock==='in'?q:-q;master.stock[n].current+=d;state.stockAdjust.push({name:n,delta:d,type:b.dataset.stock==='in'?'入庫':'廃棄',date:new Date().toLocaleString('ja-JP')});await save();render()});
@@ -98,6 +111,29 @@ function wire(){
  }
  if(tab==='prep'){el('addPrep').onclick=async()=>{state.prep.push({name:el('prepName').value,qty:el('prepQty').value,staff:el('prepStaff').value,note:el('prepNote').value,status:'未完了',date:new Date().toLocaleString('ja-JP')});await save();render()};document.querySelectorAll('[data-prepdone]').forEach(b=>b.onclick=async()=>{state.prep[+b.dataset.prepdone].status='完了';await save();render()})}
  if(tab==='notes'){el('addNote').onclick=async()=>{state.notes.push({title:el('noteTitle').value,body:el('noteBody').value,author:user.email,date:new Date().toLocaleString('ja-JP')});await save();render()};document.querySelectorAll('[data-delnote]').forEach(b=>b.onclick=async()=>{state.notes.splice(+b.dataset.delnote,1);await save();render()})}
+ if(tab==='manual'){
+  const sections=Object.keys(master.manual||{});
+  el('manualAdd').onclick=async()=>{
+   const section=el('manualNewSection').value.trim(),item=el('manualNewItem').value.trim(),content=el('manualNewContent').value.trim(),caution=el('manualNewCaution').value.trim();
+   if(!section||!item||!content){el('manualMsg').textContent='見出し・項目名・内容を入力してください';return}
+   if(!master.manual)master.manual={};if(!Array.isArray(master.manual[section]))master.manual[section]=[];
+   master.manual[section].push({item,content,caution});await save();render();
+  };
+  el('manualSearch').oninput=()=>{const q=el('manualSearch').value.trim().toLowerCase();document.querySelectorAll('.manual-section').forEach(d=>{let hit=!q||d.textContent.toLowerCase().includes(q);d.hidden=!hit;if(q&&hit)d.open=true})};
+  document.querySelectorAll('[data-manual-edit]').forEach(b=>b.onclick=async()=>{
+   const [si,ii]=b.dataset.manualEdit.split(':').map(Number),key=Object.keys(master.manual)[si],entry=master.manual[key][ii];
+   const item=prompt('項目名',entry.item);if(item===null)return;
+   const content=prompt('手順・内容',entry.content);if(content===null)return;
+   const caution=prompt('注意事項（不要なら空欄）',entry.caution||'');if(caution===null)return;
+   if(!item.trim()||!content.trim()){alert('項目名と内容は必須です');return}
+   master.manual[key][ii]={item:item.trim(),content:content.trim(),caution:caution.trim()};await save();render();
+  });
+  document.querySelectorAll('[data-manual-delete]').forEach(b=>b.onclick=async()=>{
+   const [si,ii]=b.dataset.manualDelete.split(':').map(Number),key=Object.keys(master.manual)[si];
+   if(!confirm(`「${master.manual[key][ii].item}」を削除しますか？`))return;
+   master.manual[key].splice(ii,1);if(!master.manual[key].length)delete master.manual[key];await save();render();
+  });
+ }
 }
 function wireRecipeEditor(name){
  const host=$('#recipeEditor');
@@ -106,4 +142,3 @@ function wireRecipeEditor(name){
  host.querySelector('#saveRecipe').onclick=async()=>{master.recipes[name]=readRecipeRows(host);await save();alert('レシピを保存しました')};
 }
 function readRecipeRows(host){return [...host.querySelectorAll('[data-rname]')].map((x,i)=>({ingredient:x.value.trim(),amount:Number(host.querySelector(`[data-ramount="${i}"]`).value||0),unit:host.querySelector(`[data-runit="${i}"]`).value.trim()})).filter(r=>r.ingredient)}
-
