@@ -57,7 +57,7 @@ function manualUI(){
  return `<div class="card"><h2>マニュアル</h2><input id="manualSearch" placeholder="項目・手順を検索"><div id="manualSections">${Object.entries(sections).map(([section,items],si)=>`<details class="manual-section"><summary><b>${esc(section)}</b></summary><div class="manual-items">${(items||[]).map((x,i)=>`<details class="manual-entry"><summary><b>${esc(x.item)}</b></summary><div class="item"><div>${esc(x.content)}</div>${x.caution?`<div class="muted">注意：${esc(x.caution)}</div>`:'' }<div class="actions"><button data-manual-edit="${si}:${i}" class="sub">編集</button><button data-manual-delete="${si}:${i}" class="danger">削除</button></div></div></details>`).join('')}</div></details>`).join('')}</div><hr><h3>項目を追加</h3><input id="manualNewSection" placeholder="見出し（例：開店準備）"><input id="manualNewItem" placeholder="項目名"><textarea id="manualNewContent" placeholder="手順・内容"></textarea><textarea id="manualNewCaution" placeholder="注意事項（任意）"></textarea><button id="manualAdd">追加して保存</button><p id="manualMsg" class="muted"></p></div>`;
 }
 function notesUI(){return `<div class="card"><h2>共有ノート</h2><input id="noteTitle" placeholder="タイトル"><textarea id="noteBody" placeholder="共有内容"></textarea><button id="addNote">共有ノートを投稿</button></div><div class="card">${state.notes.slice().reverse().map((n,i)=>`<div class="item"><b>${esc(n.title)}</b><div>${esc(n.body)}</div><div class="muted">${esc(n.author)} · ${esc(n.date)}</div><button class="danger" data-delnote="${state.notes.length-1-i}">削除</button></div>`).join('')}</div>`}
-function recordsUI(){return `<div class="card"><h2>記録</h2><h3>業務チェック</h3>${state.checklists.slice().reverse().map(c=>`<div class="item"><b>${esc(c.date)} · ${esc(c.staff)}</b><div class="muted">完了 ${c.done.length}/${tasks.length+2}</div><div>${esc(c.overview)}</div></div>`).join('')}<h3>在庫の履歴</h3>${state.stockAdjust.slice().reverse().map(x=>`<div class="item">${esc(x.date)} · ${esc(x.name)} ${x.delta>0?'+':''}${x.delta} (${esc(x.type)})</div>`).join('')}<h3>売上履歴</h3>${(state.sales||[]).slice().reverse().map(s=>`<div class="item">${esc(s.date)} · ${esc(s.product)} ×${s.qty} · ¥${yen(s.amount)}</div>`).join('')}<h3>仕込み履歴</h3>${state.prep.map(p=>`<div class="item">${esc(p.date)} · ${esc(p.name)} ${esc(p.qty)} ${esc(p.status)}</div>`).join('')}</div>`}
+function recordsUI(){return `<div class="card"><h2>記録</h2><h3>業務チェック</h3>${state.checklists.map((c,i)=>`<div class="item"><b>${esc(c.date)} · ${esc(c.staff)}</b><div class="muted">完了 ${c.done.length}/${tasks.length+2}</div><div>${esc(c.overview)}</div><button data-share-saved-check="${i}">この記録をLINE共有</button></div>`).join('')}<h3>在庫の履歴</h3>${state.stockAdjust.slice().reverse().map(x=>`<div class="item">${esc(x.date)} · ${esc(x.name)} ${x.delta>0?'+':''}${x.delta} (${esc(x.type)})</div>`).join('')}<h3>売上履歴</h3>${(state.sales||[]).slice().reverse().map(s=>`<div class="item">${esc(s.date)} · ${esc(s.product)} ×${s.qty} · ¥${yen(s.amount)}</div>`).join('')}<h3>仕込み履歴</h3>${state.prep.map(p=>`<div class="item">${esc(p.date)} · ${esc(p.name)} ${esc(p.qty)} ${esc(p.status)}</div>`).join('')}</div>`}
 function salesUI(){
  const products=master.products||[];
  const daily=(state.sales||[]).filter(s=>s.date===today());
@@ -87,6 +87,17 @@ function wire(){
    const msg=`【POLEPOLE CAFE 業務報告】\\n日付：${date}\\n担当：${el('staff').value}\\n完了：${[...document.querySelectorAll('.task:checked')].map(x=>x.value).join('、')}\\n両替：${document.querySelector('input[name=change]:checked')?.value||'未入力'}\\n概況：${el('overview').value}\\n共有・発注：${el('orderShare').value}\\n【売上報告】\\n売上合計：¥${yen(total)}\\n${salesText}`;
    window.location.href='https://line.me/R/share?text='+encodeURIComponent(msg);
   };
+ }
+ if(tab==='records'){
+  document.querySelectorAll('[data-share-saved-check]').forEach(b=>b.onclick=()=>{
+   const c=state.checklists[Number(b.dataset.shareSavedCheck)]; if(!c)return;
+   const daily=(state.sales||[]).filter(x=>x.date===c.date);
+   const total=daily.reduce((n,x)=>n+Number(x.amount||0),0); const grouped={};
+   daily.forEach(x=>{if(!grouped[x.product])grouped[x.product]={qty:0,amount:0};grouped[x.product].qty+=Number(x.qty||0);grouped[x.product].amount+=Number(x.amount||0)});
+   const salesText=Object.entries(grouped).map(([name,v])=>name+' ×'+v.qty+'　¥'+yen(v.amount)).join('\n')||'売上登録なし';
+   const msg=['【POLEPOLE CAFE 業務報告】','日付：'+c.date,'担当：'+(c.staff||''),'完了：'+(c.done||[]).join('、'),'両替：'+(c.change||'未入力'),'概況：'+(c.overview||''),'共有・発注：'+(c.orderShare||''),'【売上報告】','売上合計：¥'+yen(total),salesText].join('\n');
+   window.location.href='https://line.me/R/share?text='+encodeURIComponent(msg);
+  });
  }
  if(tab==='stock'){
   document.querySelectorAll('[data-stock]').forEach(b=>b.onclick=async()=>{let n=b.dataset.name,q=Number(el('qty-'+encodeURIComponent(n)).value||0);if(!q)return;let d=b.dataset.stock==='in'?q:-q;master.stock[n].current+=d;state.stockAdjust.push({name:n,delta:d,type:b.dataset.stock==='in'?'入庫':'廃棄',date:new Date().toLocaleString('ja-JP')});await save();render()});
