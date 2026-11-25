@@ -48,7 +48,8 @@ function render(){
   if(tab==='recipes')a.innerHTML=recipesUI();
   wire();
 }
-function checkUI(){return `<div class="card"><h2>今日の業務チェック</h2><div class="row"><input id="staff" placeholder="スタッフ名"><input id="workdate" type="date" value="${today()}"></div>${tasks.map(t=>`<label class="check"><input type="checkbox" class="task" value="${t}">${t}</label>`).join('')}<label class="check"><input type="checkbox" class="task" value="自由項目1"><span style="display:inline-block;width:140px;border-bottom:1px solid #999">&nbsp;</span></label><label class="check"><input type="checkbox" class="task" value="自由項目2"><span style="display:inline-block;width:140px;border-bottom:1px solid #999">&nbsp;</span></label><p>両替</p><label><input type="radio" name="change" value="有り"> 有り</label> <label><input type="radio" name="change" value="無し"> 無し</label><h3>概況</h3><textarea id="overview"></textarea><h3>共有・発注</h3><textarea id="orderShare"></textarea><div class="actions"><button id="saveCheck">チェックを保存</button><button class="sub" id="shareCheck">LINE共有</button></div></div>`}
+function checkSalesHTML(date){const daily=(state.sales||[]).filter(s=>s.date===date);const total=daily.reduce((n,s)=>n+Number(s.amount||0),0);const grouped={};daily.forEach(s=>{if(!grouped[s.product])grouped[s.product]={qty:0,amount:0};grouped[s.product].qty+=Number(s.qty||0);grouped[s.product].amount+=Number(s.amount||0)});return `<div class="item"><b>売上合計：¥${yen(total)}</b>${Object.entries(grouped).map(([name,v])=>`<div>${esc(name)} ×${v.qty}　¥${yen(v.amount)}</div>`).join('')||'<div class="muted">売上登録なし</div>'}</div>`}
+function checkUI(){return `<div class="card"><h2>今日の業務チェック</h2><div class="row"><input id="staff" placeholder="スタッフ名"><input id="workdate" type="date" value="${today()}"></div><h3>売上確認</h3><div id="checkSalesSummary">${checkSalesHTML(today())}</div>${tasks.map(t=>`<label class="check"><input type="checkbox" class="task" value="${t}">${t}</label>`).join('')}<label class="check"><input type="checkbox" class="task" value="自由項目1"><span style="display:inline-block;width:140px;border-bottom:1px solid #999">&nbsp;</span></label><label class="check"><input type="checkbox" class="task" value="自由項目2"><span style="display:inline-block;width:140px;border-bottom:1px solid #999">&nbsp;</span></label><p>両替</p><label><input type="radio" name="change" value="有り"> 有り</label> <label><input type="radio" name="change" value="無し"> 無し</label><h3>概況</h3><textarea id="overview"></textarea><h3>共有・発注</h3><textarea id="orderShare"></textarea><div class="actions"><button id="saveCheck">チェックを保存</button><button class="sub" id="shareCheck">LINE共有</button></div></div>`}
 function stockUI(){return `<div class="card"><h2>在庫管理</h2><p class="muted">入庫・廃棄・販売を記録します。</p><input id="stockSearch" placeholder="在庫を検索"><div id="stockList">${Object.entries(master.stock||{}).map(([n,v])=>`<div class="item stockrow"><b>${esc(n)}</b><span class="pill">現在庫 ${v.current}</span><div class="row"><input type="number" min="0" step="0.1" placeholder="数量" id="qty-${encodeURIComponent(n)}"><button data-stock="in" data-name="${esc(n)}">入庫＋</button><button class="danger" data-stock="out" data-name="${esc(n)}">廃棄−</button></div></div>`).join('')}</div><p class="muted">販売の登録は「売上管理」から行います。</p></div>`}
 function prepUI(){return `<div class="card"><h2>仕込み管理</h2><input id="prepName" placeholder="仕込み品目"><div class="row"><input id="prepQty" placeholder="数量"><input id="prepStaff" placeholder="担当者"></div><textarea id="prepNote" placeholder="メモ"></textarea><button id="addPrep">仕込みを登録</button></div><div class="card"><h3>仕込み項目（マニュアルより）</h3>${(master.prep||[]).map(x=>`<div class="item"><b>${esc(x.item)}</b><div>${esc(x.content)}</div><div class="muted">${esc(x.caution)}</div></div>`).join('')}${state.prep.map((p,i)=>`<div class="item"><b>${esc(p.name)}</b> ${esc(p.qty)} <span class="pill">${esc(p.status)}</span><div class="muted">${esc(p.staff)} · ${esc(p.date)}</div><button data-prepdone="${i}">完了</button></div>`).join('')}</div>`}
 function manualUI(){
@@ -74,6 +75,7 @@ function recipeEditorHTML(name){
 function wire(){
  let el=id=>document.getElementById(id);
  if(tab==='check'){
+  el('workdate').onchange=()=>{el('checkSalesSummary').innerHTML=checkSalesHTML(el('workdate').value)};
   el('saveCheck').onclick=async()=>{let done=[...document.querySelectorAll('.task:checked')].map(x=>x.value),c={date:el('workdate').value,staff:el('staff').value,done,change:document.querySelector('input[name=change]:checked')?.value||'',overview:el('overview').value,orderShare:el('orderShare').value};state.checklists.push(c);await save();alert('保存しました')};
   el('shareCheck').onclick=()=>{
    const date=el('workdate').value;
@@ -81,9 +83,9 @@ function wire(){
    const total=daily.reduce((n,s)=>n+Number(s.amount||0),0);
    const grouped={};
    daily.forEach(s=>{if(!grouped[s.product])grouped[s.product]={qty:0,amount:0};grouped[s.product].qty+=Number(s.qty||0);grouped[s.product].amount+=Number(s.amount||0)});
-   const salesText=Object.entries(grouped).map(([name,v])=>`${name} ×${v.qty}　¥${yen(v.amount)}`).join('\n')||'売上登録なし';
-   const msg=`【POLEPOLE CAFE 業務報告】\n日付：${date}\n担当：${el('staff').value}\n完了：${[...document.querySelectorAll('.task:checked')].map(x=>x.value).join('、')}\n両替：${document.querySelector('input[name=change]:checked')?.value||'未入力'}\n概況：${el('overview').value}\n共有・発注：${el('orderShare').value}\n【売上報告】\n売上合計：¥${yen(total)}\n${salesText}`;
-   if(navigator.share)navigator.share({text:msg}).catch(()=>{});else navigator.clipboard.writeText(msg).then(()=>alert('共有文をコピーしました')).catch(()=>alert('共有文をコピーできませんでした'));
+   const salesText=Object.entries(grouped).map(([name,v])=>`${name} ×${v.qty}　¥${yen(v.amount)}`).join('\\n')||'売上登録なし';
+   const msg=`【POLEPOLE CAFE 業務報告】\\n日付：${date}\\n担当：${el('staff').value}\\n完了：${[...document.querySelectorAll('.task:checked')].map(x=>x.value).join('、')}\\n両替：${document.querySelector('input[name=change]:checked')?.value||'未入力'}\\n概況：${el('overview').value}\\n共有・発注：${el('orderShare').value}\\n【売上報告】\\n売上合計：¥${yen(total)}\\n${salesText}`;
+   window.location.href='https://line.me/R/share?text='+encodeURIComponent(msg);
   };
  }
  if(tab==='stock'){
