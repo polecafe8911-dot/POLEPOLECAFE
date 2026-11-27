@@ -23,6 +23,7 @@ async function load(){
     if(s.exists()){
       state={...state,...s.data()};
       state.dailyCheckTasks=state.dailyCheckTasks||{};
+      state.dailyTaskPriorities=state.dailyTaskPriorities||{};
       state.everydayTaskExtras=state.everydayTaskExtras||[];
       // 毎日の固定項目とは別に、日ごとの追加作業を管理する。
       // 誤って登録されたソーセージ・ベーコンは、過去の日付を含めて共有データから除去する。
@@ -47,7 +48,9 @@ async function load(){
 }
 async function save(){
   if(!user)return;
-  await setDoc(doc(db,'shared','appData'),{...state,stockData:master.stock,recipesData:master.recipes,productsData:master.products,pricesData:state.prices,manualData:master.manual,updatedAt:serverTimestamp()});
+  // 優先順位は専用の部分更新で保存し、他画面の古いstateで上書きしない。
+  const {dailyTaskPriorities,...sharedState}=state;
+  await setDoc(doc(db,'shared','appData'),{...sharedState,stockData:master.stock,recipesData:master.recipes,productsData:master.products,pricesData:state.prices,manualData:master.manual,updatedAt:serverTimestamp()},{merge:true});
 }
 function show(){$('#tabs').hidden=!user;$('#login').hidden=!!user;$('#authState').textContent=user?(user.email||'ログイン中'):'未ログイン';if(user)render()}
 onAuthStateChanged(auth,async u=>{user=u;if(u){try{await load();show()}catch(e){$('#loginMsg').textContent=e.message;show()}}else show()});
@@ -96,7 +99,7 @@ function recipeEditorHTML(name){
  return `<h3>${esc(name)} の材料</h3>${rows.map((r,i)=>`<div class="row recipe-row"><input data-rname="${i}" value="${esc(r.ingredient)}" placeholder="材料名"><input data-ramount="${i}" type="number" step="0.01" value="${r.amount}" placeholder="使用量"><input data-runit="${i}" value="${esc(r.unit||'')}" placeholder="単位"><button class="danger" data-rdel="${i}">削除</button></div>`).join('')}<h3>材料を追加</h3><div class="row"><input id="newIngredient" placeholder="材料名"><input id="newAmount" type="number" min="0" step="0.01" placeholder="使用量"><input id="newUnit" placeholder="単位"></div><div class="actions"><button id="addIngredient">材料を追加</button><button id="saveRecipe">レシピを保存</button></div><p class="muted">ここで登録した材料と使用量が、売上登録時の在庫減算に使われます。材料名は在庫管理の名称と一致させてください。</p>`;
 }
 function wireDailyTaskChecks(date){document.querySelectorAll('.daily-task').forEach(input=>{input.onchange=async()=>{state.dailyTaskDone=state.dailyTaskDone||{};const done=new Set(state.dailyTaskDone[date]||[]);if(input.checked)done.add(input.value);else done.delete(input.value);state.dailyTaskDone[date]=[...done];await save();$('#dailyReminder').innerHTML=dailyReminderHTML(date);wireReminderTime();};});}
-function wireDailyTaskPriorities(date){document.querySelectorAll('.taskPriority').forEach(select=>select.onchange=async()=>{state.dailyTaskPriorities=state.dailyTaskPriorities||{};state.dailyTaskPriorities[date]=state.dailyTaskPriorities[date]||{};state.dailyTaskPriorities[date][select.dataset.task]=select.value;await save();$('#todayTasks').innerHTML=dailyTaskRows(date);wireDailyTaskChecks(date);wireDailyTaskPriorities(date);wireDailyTaskDeletes(date);});}
+function wireDailyTaskPriorities(date){document.querySelectorAll('.taskPriority').forEach(select=>select.onchange=async()=>{state.dailyTaskPriorities=state.dailyTaskPriorities||{};state.dailyTaskPriorities[date]=state.dailyTaskPriorities[date]||{};state.dailyTaskPriorities[date][select.dataset.task]=select.value;try{await setDoc(doc(db,'shared','appData'),{dailyTaskPriorities:state.dailyTaskPriorities,updatedAt:serverTimestamp()},{merge:true});}catch(e){alert('優先順位を保存できませんでした: '+e.message);return;}$('#todayTasks').innerHTML=dailyTaskRows(date);wireDailyTaskChecks(date);wireDailyTaskPriorities(date);wireDailyTaskDeletes(date);});}
 function wireDailyTaskDeletes(date){document.querySelectorAll('[data-delete-daily-task]').forEach(b=>b.onclick=async()=>{const name=b.dataset.deleteDailyTask;state.dailyCheckTasks[date]=(state.dailyCheckTasks[date]||[]).filter(t=>t!==name);if(state.dailyTaskPriorities?.[date])delete state.dailyTaskPriorities[date][name];await save();$('#todayTasks').innerHTML=dailyTaskRows(date);wireDailyTaskChecks(date);wireDailyTaskPriorities(date);wireDailyTaskDeletes(date);});}
 function wireReminderTime(){const input=$('#dailyReminderTime'),button=$('#saveReminderTime');if(!input||!button)return;button.onclick=async()=>{const date=$('#workdate').value;state.dailyReminderTimes=state.dailyReminderTimes||{};state.dailyReminderTimes[date]=input.value;await save();$('#dailyReminder').innerHTML=dailyReminderHTML(date);wireReminderTime();alert('この日の通知時刻を保存しました');};}
 function wire(){
