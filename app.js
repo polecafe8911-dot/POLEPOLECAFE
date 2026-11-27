@@ -21,8 +21,17 @@ async function load(){
     if(s.exists()){
       state={...state,...s.data()};
       state.dailyCheckTasks=state.dailyCheckTasks||{};
-      const oldExtras=(state.checkTaskExtras||[]).filter(t=>!['ソーセージ','ベーコン'].includes(t));
-      if(oldExtras.length){state.dailyCheckTasks[today()]=[...(state.dailyCheckTasks[today()]||[]),...oldExtras.filter(t=>!(state.dailyCheckTasks[today()]||[]).includes(t))];state.checkTaskExtras=[];await save();}
+      // 毎日の固定項目とは別に、日ごとの追加作業を管理する。
+      // 誤って登録されたソーセージ・ベーコンは、過去の日付を含めて共有データから除去する。
+      let cleaned=false;
+      state.dailyCheckTasks=state.dailyCheckTasks||{};
+      for(const [date,items] of Object.entries(state.dailyCheckTasks)){
+        const next=(items||[]).filter(t=>!['ソーセージ','ベーコン'].includes(typeof t==='string'?t:t?.name));
+        if(next.length!==(items||[]).length){state.dailyCheckTasks[date]=next;cleaned=true;}
+      }
+      if((state.checkTaskExtras||[]).some(t=>['ソーセージ','ベーコン'].includes(t)))cleaned=true;
+      state.checkTaskExtras=(state.checkTaskExtras||[]).filter(t=>!['ソーセージ','ベーコン'].includes(t));
+      if(cleaned)await save();
       if(state.stockData)for(const [k,v] of Object.entries(state.stockData))if(master.stock[k])master.stock[k]=v;
       if(state.recipesData)master.recipes=state.recipesData;
       if(state.productsData)master.products=state.productsData;
