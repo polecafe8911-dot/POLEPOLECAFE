@@ -20,6 +20,7 @@ async function load(){
     const s=await getDoc(doc(db,'shared','appData'));
     if(s.exists()){
       state={...state,...s.data()};
+      state.checkTaskExtras=(state.checkTaskExtras||[]).filter(t=>!['ソーセージ','ベーコン'].includes(t));
       if(state.stockData)for(const [k,v] of Object.entries(state.stockData))if(master.stock[k])master.stock[k]=v;
       if(state.recipesData)master.recipes=state.recipesData;
       if(state.productsData)master.products=state.productsData;
