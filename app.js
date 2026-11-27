@@ -119,14 +119,14 @@ function wire(){
   el('saveCheck').onclick=async()=>{const date=el('workdate').value,labels=[...everydayTasks(),...new Set([...(state.dailyTaskDone?.[date]||[]),...(state.dailyCheckTasks?.[date]||[])])];let done=[...new Set([...document.querySelectorAll('.task:checked')].map(x=>x.value).concat(state.dailyTaskDone?.[date]||[]))],priority=Object.fromEntries([...document.querySelectorAll('.taskPriority')].map(x=>[x.dataset.task,x.value])),c={date,staff:el('staff').value,done,priority,taskLabels:labels,change:document.querySelector('input[name=change]:checked')?.value||'',overview:el('overview').value,orderShare:el('orderShare').value};state.checklists.push(c);await save();alert('保存しました')};
   el('shareCheck').onclick=()=>{
    const date=el('workdate').value;
-   const msg=['【POLEPOLE CAFE 業務報告】','日付：'+date,'担当：'+el('staff').value,'完了：'+[...document.querySelectorAll('.task:checked')].map(x=>x.value).join('、'),'両替：'+(document.querySelector('input[name=change]:checked')?.value||'未入力'),'概況：'+(el('overview').value||''),'共有・発注：'+(el('orderShare').value||''),...salesShareLines(date)].join('\\n');
+   const msg=['【POLEPOLE CAFE 業務報告】','日付：'+date,'担当：'+el('staff').value,'完了：'+[...document.querySelectorAll('.task:checked')].map(x=>x.value).join('、'),'両替：'+(document.querySelector('input[name=change]:checked')?.value||'未入力'),'概況：'+(el('overview').value||''),'共有・発注：'+(el('orderShare').value||''),...salesShareLines(date)].join('\n');
    window.location.href='https://line.me/R/share?text='+encodeURIComponent(msg);
   };
  }
  if(tab==='records'){
   document.querySelectorAll('[data-share-saved-check]').forEach(b=>b.onclick=()=>{
    const c=state.checklists[Number(b.dataset.shareSavedCheck)];if(!c)return;
-   const msg=['【POLEPOLE CAFE 業務報告】','日付：'+c.date,'担当：'+(c.staff||''),'完了：'+(c.done||[]).join('、'),'両替：'+(c.change||'未入力'),'概況：'+(c.overview||''),'共有・発注：'+(c.orderShare||''),...salesShareLines(c.date)].join('\\n');
+   const msg=['【POLEPOLE CAFE 業務報告】','日付：'+c.date,'担当：'+(c.staff||''),'完了：'+(c.done||[]).join('、'),'両替：'+(c.change||'未入力'),'概況：'+(c.overview||''),'共有・発注：'+(c.orderShare||''),...salesShareLines(c.date)].join('\n');
    window.location.href='https://line.me/R/share?text='+encodeURIComponent(msg);
   });
  }
