@@ -102,8 +102,8 @@ function wire(){
    const total=daily.reduce((n,s)=>n+Number(s.amount||0),0);
    const grouped={};
    daily.forEach(s=>{if(!grouped[s.product])grouped[s.product]={qty:0,amount:0};grouped[s.product].qty+=Number(s.qty||0);grouped[s.product].amount+=Number(s.amount||0)});
-   const salesText=Object.entries(grouped).map(([name,v])=>`${name} ×${v.qty}　¥${yen(v.amount)}`).join('\\n')||'売上登録なし';
-   const msg=`【POLEPOLE CAFE 業務報告】\\n日付：${date}\\n担当：${el('staff').value}\\n完了：${[...document.querySelectorAll('.task:checked')].map(x=>x.value).join('、')}\\n両替：${document.querySelector('input[name=change]:checked')?.value||'未入力'}\\n概況：${el('overview').value}\\n共有・発注：${el('orderShare').value}\\n【売上報告】\\n売上合計：¥${yen(total)}\\n${salesText}`;
+   const salesText=Object.entries(grouped).map(([name,v])=>`${name} ×${v.qty}　¥${yen(v.amount)}`).join('\n')||'売上登録なし';
+   const msg=['【POLEPOLE CAFE 業務報告】','日付：'+date,'担当：'+el('staff').value,'完了：'+[...document.querySelectorAll('.task:checked')].map(x=>x.value).join('、'),'両替：'+(document.querySelector('input[name=change]:checked')?.value||'未入力'),'概況：'+(el('overview').value||''),'共有・発注：'+(el('orderShare').value||''),'【売上報告】','売上合計：¥'+yen(total),salesText].join('\n');
    window.location.href='https://line.me/R/share?text='+encodeURIComponent(msg);
   };
  }
